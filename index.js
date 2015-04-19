@@ -120,6 +120,20 @@ function encodeTorrentFile(parsed) {
     info: parsed.info
   };
 
+  ensure(parsed.info, 'info');
+  ensure(parsed.info.name, 'info.name');
+  ensure(parsed.info['piece length'], 'info[\'piece length\']');
+  ensure(parsed.info.pieces, 'info.pieces');
+
+  if (parsed.info.files) {
+    parsed.info.files.forEach(function (file) {
+      ensure(typeof file.length === 'number', 'info.files[0].length')
+      ensure(file.path, 'info.files[0].path')
+    })
+  } else {
+    ensure(typeof parsed.info.length === 'number', 'info.length')
+  }
+
   if (parsed.announce && parsed.announce[0]) {
     torrent.announce = parsed.announce[0]
   }
