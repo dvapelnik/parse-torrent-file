@@ -3,6 +3,9 @@
   "description": "Parse a .torrent file and return an object of keys/values",
   "version": "2.1.3",
   "author": "Feross Aboukhadijeh <feross@feross.org> (http://feross.org/)",
+  "contributors": [
+    "Dmitry Vapelnik <dvapelnik@gmail.com>"
+  ],
   "bin": "./bin/cmd.js",
   "bugs": {
     "url": "https://github.com/feross/parse-torrent-file/issues"

@@ -10,8 +10,13 @@ var sha1 = require('simple-sha1')
  * Parse a torrent. Throws an exception if the torrent is missing required fields.
  * @param  {Buffer|Object} torrent
  * @return {Object}        parsed torrent
+ * @param  {Boolean}      fromDirectInput
  */
-function decodeTorrentFile (torrent) {
+function decodeTorrentFile(torrent, fromDirectInput) {
+  fromDirectInput = fromDirectInput === undefined
+    ? false
+    : fromDirectInput;
+
   if (Buffer.isBuffer(torrent)) {
     torrent = bencode.decode(torrent)
   }
@@ -22,6 +27,7 @@ function decodeTorrentFile (torrent) {
   ensure(torrent.info['piece length'], 'info[\'piece length\']')
   ensure(torrent.info.pieces, 'info.pieces')
 
+  // is torrent file with multiple shared files
   if (torrent.info.files) {
     torrent.info.files.forEach(function (file) {
       ensure(typeof file.length === 'number', 'info.files[0].length')
@@ -39,7 +45,15 @@ function decodeTorrentFile (torrent) {
   result.name = torrent.info.name.toString()
   result.private = !!torrent.info.private
 
+  if (torrent['publisher']) result.publisher = torrent['publisher'].toString()
+  if (torrent['publisher-url']) result.publisherUrl = torrent['publisher-url'].toString()
+
+  if (torrent['created by']) result.creator = torrent['created by'].toString()
   if (torrent['creation date']) result.created = new Date(torrent['creation date'] * 1000)
+
+  result.encoding = torrent.encoding
+    ? torrent.encoding.toString()
+    : 'UTF-8';
 
   if (Buffer.isBuffer(torrent.comment)) result.comment = torrent.comment.toString()
 
@@ -65,7 +79,7 @@ function decodeTorrentFile (torrent) {
   if (Buffer.isBuffer(torrent['url-list'])) {
     // some clients set url-list to empty string
     torrent['url-list'] = torrent['url-list'].length > 0
-      ? [ torrent['url-list'] ]
+      ? [torrent['url-list']]
       : []
   }
   result.urlList = (torrent['url-list'] || []).map(function (url) {
@@ -91,7 +105,7 @@ function decodeTorrentFile (torrent) {
 
   result.pieceLength = torrent.info['piece length']
   result.lastPieceLength = ((lastFile.offset + lastFile.length) % result.pieceLength) || result.pieceLength
-  result.pieces = splitPieces(torrent.info.pieces)
+  result.pieces = splitPieces(torrent.info.pieces, result.encoding.toLowerCase().replace('-', ''))
 
   return result
 }
@@ -101,10 +115,10 @@ function decodeTorrentFile (torrent) {
  * @param  {Object} parsed parsed torrent
  * @return {Buffer}
  */
-function encodeTorrentFile (parsed) {
+function encodeTorrentFile(parsed) {
   var torrent = {
     info: parsed.info
-  }
+  };
 
   if (parsed.announce && parsed.announce[0]) {
     torrent.announce = parsed.announce[0]
@@ -122,24 +136,34 @@ function encodeTorrentFile (parsed) {
     })
   }
 
-  if (parsed.created) {
-    torrent['creation date'] = (parsed.created.getTime() / 1000) | 0
-  }
+  if (parsed.comment) torrent.comment = new Buffer(parsed.comment, 'utf8')
+
+  if (parsed.encoding) torrent.encoding = new Buffer(parsed.encoding, 'utf8')
+
+  if (parsed.publisher) torrent['publisher'] = new Buffer(parsed.publisher, 'utf8')
+  if (parsed.publisherUrl) torrent['publisher-url'] = new Buffer(parsed.publisherUrl, 'utf8')
+
+  if (parsed.creator) torrent['created by'] = new Buffer(parsed.creator, 'utf8')
+  if (parsed.created) torrent['creation date'] = (parsed.created.getTime() / 1000) | 0
+
+  if (parsed.private !== undefined) torrent.info.private = +parsed.private
+
   return bencode.encode(torrent)
 }
 
-function sumLength (sum, file) {
+function sumLength(sum, file) {
   return sum + file.length
 }
 
-function splitPieces (buf) {
+function splitPieces(pieceBuffer, encoding) {
+  var hashString = pieceBuffer.toString(encoding)
   var pieces = []
-  for (var i = 0; i < buf.length; i += 20) {
-    pieces.push(buf.slice(i, i + 20).toString('hex'))
+  for (var i = 0; i < hashString.length; i += 20) {
+    pieces.push(hashString.slice(i, i + 20).toString('hex'))
   }
   return pieces
 }
 
-function ensure (bool, fieldName) {
+function ensure(bool, fieldName) {
   if (!bool) throw new Error('Torrent is missing required field: ' + fieldName)
 }
