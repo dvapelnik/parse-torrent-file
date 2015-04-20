@@ -10,13 +10,8 @@ var sha1 = require('simple-sha1')
  * Parse a torrent. Throws an exception if the torrent is missing required fields.
  * @param  {Buffer|Object} torrent
  * @return {Object}        parsed torrent
- * @param  {Boolean}      fromDirectInput
  */
-function decodeTorrentFile(torrent, fromDirectInput) {
-  fromDirectInput = fromDirectInput === undefined
-    ? false
-    : fromDirectInput;
-
+function decodeTorrentFile(torrent) {
   if (Buffer.isBuffer(torrent)) {
     torrent = bencode.decode(torrent)
   }
@@ -43,7 +38,7 @@ function decodeTorrentFile(torrent, fromDirectInput) {
   result.infoHash = sha1.sync(result.infoBuffer)
 
   result.name = torrent.info.name.toString()
-  result.private = !!torrent.info.private
+  result.private = torrent.info.private === undefined ? false : !!torrent.info.private
 
   if (torrent['publisher']) result.publisher = torrent['publisher'].toString()
   if (torrent['publisher-url']) result.publisherUrl = torrent['publisher-url'].toString()
@@ -158,7 +153,9 @@ function encodeTorrentFile(parsed) {
   if (parsed.publisherUrl) torrent['publisher-url'] = new Buffer(parsed.publisherUrl, 'utf8')
 
   if (parsed.creator) torrent['created by'] = new Buffer(parsed.creator, 'utf8')
-  if (parsed.created) torrent['creation date'] = (parsed.created.getTime() / 1000) | 0
+
+  if (!parsed.created) parsed.created = new Date()
+  torrent['creation date'] = (parsed.created.getTime() / 1000) | 0
 
   if (parsed.private !== undefined) torrent.info.private = +parsed.private
 
